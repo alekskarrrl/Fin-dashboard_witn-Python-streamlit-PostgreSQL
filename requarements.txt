@@ -5,9 +5,11 @@ Created on Thu Mar 11 20:10:59 2021
 @author: User
 """
 
+streamlit
+pandas
+plotly
 alpaca_trade_api
 psycopg2 
 asyncpg
-aiohttp
 requests
 psaw

@@ -49,3 +49,17 @@ CREATE TABLE stock_price (
 
 CREATE INDEX ON stock_price (stock_id, dt DESC);
 SELECT create_hypertable('stock_price', 'dt');
+
+CREATE TABLE portfolios (
+	portfolio TEXT NOT NULL,
+	stock_id INTEGER NOT NULL,
+	dt DATE NOT NULL,
+	shares NUMERIC,
+	avg_purchase_price NUMERIC,
+	purchase_value NUMERIC,
+	sales_value NUMERIC,
+	PRIMARY KEY (portfolio, stock_id, dt),
+	CONSTRAINT fk_stock_portfolios FOREIGN KEY (stock_id) REFERENCES stock (id)
+
+);
+
