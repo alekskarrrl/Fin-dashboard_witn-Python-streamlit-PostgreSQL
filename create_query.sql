@@ -7,6 +7,13 @@ CREATE TABLE stock (
 );
 
 
+<<<<<<< HEAD
+
+
+
+
+=======
+>>>>>>> 5e12f69a0b3fe4e192d4dbb9640da803624873af
 CREATE TABLE mention (
     stock_id INTEGER NOT NULL,
     dt TIMESTAMP WITHOUT TIME ZONE NOT NULL,
@@ -63,3 +70,23 @@ CREATE TABLE portfolios (
 
 );
 
+<<<<<<< HEAD
+CREATE TABLE currencies_catalog (
+	valute_id TEXT Primary Key,
+	name TEXT NOT NULL,
+	eng_name TEXT NOT NULL,
+	char_code TEXT,
+	num_code TEXT
+);
+
+CREATE TABLE currency_price_cbrf (
+	valute_id TEXT NOT NULL,
+	dt TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+	value NUMERIC NOT NULL,
+	PRIMARY KEY (valute_id, dt),
+	CONSTRAINT fk_currency FOREIGN KEY (valute_id) REFERENCES currencies_catalog (valute_id)
+
+);
+
+=======
+>>>>>>> 5e12f69a0b3fe4e192d4dbb9640da803624873af

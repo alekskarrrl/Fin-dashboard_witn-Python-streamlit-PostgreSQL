@@ -1,0 +1,11 @@
+# Ignore config file
+config.py
+.dockerignore
+requirements_old.txt
+Dockerfile
+*.gif
+*.bat
+env/
+.idea/
+
+__pycache__/
