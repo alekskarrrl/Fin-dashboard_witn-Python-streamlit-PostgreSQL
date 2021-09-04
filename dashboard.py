@@ -35,7 +35,7 @@ st.image("top_img.jpg")
 
 st.sidebar.title("Options")
 
-option = st.sidebar.selectbox("Which Dashboards&", ("wallstreetbets", "stocktwits", "Portfolio", "Tinkoff Invest", "Fundamental Data"))
+option = st.sidebar.selectbox("Which Dashboards", ("wallstreetbets", "stocktwits", "Portfolio", "Tinkoff Invest", "Fundamental Data"))
 # st.header(option)
 
 
