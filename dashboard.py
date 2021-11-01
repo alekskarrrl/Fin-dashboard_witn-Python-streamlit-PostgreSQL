@@ -20,7 +20,6 @@ import csv
 
 import tinkoff_invest as tcs
 import cbrf_currencies as cbr
-import portfolio
 import wallstreetbets as wsb
 import fundamental
 import config
@@ -474,7 +473,7 @@ if option == "Tinkoff Invest":
 
             file_name = f'fifo_{selected_acc}_{selected_ticker}_{end_date.strftime("%d-%m-%Y")}.csv'
             if st.button(f"Save report to csv file {file_name}?"):
-                df_fifo_table.to_csv(file_name)
+                df_fifo_table.to_csv(file_name, sep=';')
 
                 Profit_info = {'Current Profit': round(current_profit_db, 2),
                                'Current Profit RUB': round(current_profit_RUB_db, 2),
