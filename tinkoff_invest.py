@@ -4,6 +4,7 @@ import streamlit as st
 import json
 import psycopg2.extras
 from datetime import datetime
+import requests
 
 import config
 
@@ -71,6 +72,55 @@ def get_positions_by_acc(account_id, client):
 
     return df_positions
 
+# ------------------------ API V 2 --- positions
+# @st.cache
+def api2_get_positions_by_acc(account_id, api_token):
+    """Get the portfolio positions of the specified account, write the received data into
+       pandas.DataFrame and return the dataframe.
+
+    Arguments:
+    account_id: str
+    Returns: df_positions: pandas.DataFrame
+    """
+    data = {
+      "accountId": account_id
+    }
+
+    head = {'Authorization': 'Bearer ' + api_token}
+
+    url_get_portfolio = 'https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.OperationsService/GetPortfolio'
+    response = requests.post(url_get_portfolio, json=data, headers=head)
+    r = response.json()
+
+
+    positions = r.get('positions')  # get portfolio by broker_account_id
+    # df_positions = pd.DataFrame(columns=["Name", "Ticker", "Balance", "Currency", "Price"])
+    df_positions = pd.DataFrame(columns=["Figi", "InstrumentType", "Balance", "Currency", "AvgPositionPriceFifo", "CurrentPrice"])
+
+    for position in positions:
+        figi = position.get('figi')
+        instrumentType = position.get('instrumentType')
+        quantity = position.get('quantity').get('units')
+        averagePositionPriceFifo_units = int(position.get('averagePositionPriceFifo').get('units'))
+        averagePositionPriceFifo_nano = position.get('averagePositionPriceFifo').get('nano') / 1000000000
+        averagePositionPriceFifo = averagePositionPriceFifo_units + averagePositionPriceFifo_nano
+
+        currentPrice_units = int(position.get('currentPrice').get('units'))
+        currentPrice_nano = position.get('currentPrice').get('nano') / 1000000000
+        currentPrice = currentPrice_units + currentPrice_nano
+        currency = position.get('currentPrice').get('currency')
+        df_positions = df_positions.append({"Figi": figi,
+                                            "InstrumentType": instrumentType,
+                                            "Balance": quantity,
+                                            "Currency": currency,
+                                            "AvgPositionPriceFifo": averagePositionPriceFifo,
+                                            "CurrentPrice": currentPrice
+                                            },
+                                           ignore_index=True)
+
+    return df_positions
+
+# ------------------------ API V 2 --- positions
 
 def split_buy_fifo(row_counter, df):
     """The method inserts a row into the dataframe after row number row_counter by changing the index and
@@ -97,7 +147,7 @@ def split_buy_fifo(row_counter, df):
     return df
 
 
-@st.cache
+# @st.cache
 def get_user_accs_info(client):
     """Through the API client, method receive info about accounts and returns in dictionary format:
     key=broker_account_id, value=broker_account_type.
@@ -137,7 +187,7 @@ def add_tcs_accs_to_db(conn, client):
                                     VALUES (%s, %s, %s, %s, %s)
                                     """, (item[0], type, config.ACC_OWNER, 'Tinkoff', True))
 
-    conn.commit()
+        conn.commit()
 
     return
 
@@ -156,7 +206,7 @@ def fill_tcs_stock(conn, client):
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
     data = client.get_market_stocks()
     # Get all symbols (tickers) from 'stock' table
-    cursor.execute(""" Select symbol from stock  """)
+    cursor.execute(""" Select symbol from stock WHERE type = 'stock' OR type is Null """)
     fetched_rows = cursor.fetchall()
     tickers = []
     for row in fetched_rows:
@@ -176,7 +226,7 @@ def fill_tcs_stock(conn, client):
                                Where symbol = %s
                                """, (item.currency.name.upper(), item.figi, item.isin, item.lot,
                                      item.min_price_increment, item.type.name, item.min_quantity, item.ticker))
-        conn.commit()
+            conn.commit()
 
     return
 
@@ -194,14 +244,26 @@ def fill_tcs_currencies(conn, client):
 
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    for item in currencies:
-        cursor.execute("""  INSERT INTO stock (symbol, name, exchange, is_etf, currency, figi, isin, lot, min_price_increment, type, min_quantity)
-                                                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                                        """, (
-            item.ticker, item.name, 'MOEX', False, item.currency.value, item.figi, item.isin, item.lot,
-            item.min_price_increment, item.type.value, item.min_quantity))
+    # check if such "symbol" exists in the table
+    cursor.execute(""" Select symbol from stock WHERE type='Currency' """)
+    fetched_rows = cursor.fetchall()
+    tickers = set()
+    for row in fetched_rows:
+        tickers.add(row[0])
 
-    conn.commit()
+    for item in currencies:
+        if symbol not in tickers:
+
+            cursor.execute("""  INSERT INTO stock (symbol, name, exchange, is_etf, currency, figi, isin, lot, min_price_increment, type, min_quantity)
+                                                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                                            """, (
+                item.ticker, item.name, 'MOEX', False, item.currency.value, item.figi, item.isin, item.lot,
+                item.min_price_increment, item.type.value, item.min_quantity))
+
+            conn.commit()
+
+        else:
+            print(f"{symbol} is already exist")
 
     return
 
@@ -219,14 +281,25 @@ def fill_tcs_etfs(conn, client):
 
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    for item in etfs:
-        cursor.execute("""  INSERT INTO stock (symbol, name, exchange, is_etf, currency, figi, isin, lot, min_price_increment, type, min_quantity)
-                                                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                                            """, (
-            item.ticker, item.name, 'MOEX', True, item.currency.value, item.figi, item.isin, item.lot,
-            item.min_price_increment, item.type.value, item.min_quantity))
+    # check if such "symbol" exists in the table
+    cursor.execute(""" Select symbol from stock WHERE type='Etf' """)
+    fetched_rows = cursor.fetchall()
+    tickers = set()
+    for row in fetched_rows:
+        tickers.add(row[0])
 
-    conn.commit()
+    for item in etfs:
+        if symbol not in tickers:
+            cursor.execute("""  INSERT INTO stock (symbol, name, exchange, is_etf, currency, figi, isin, lot, min_price_increment, type, min_quantity)
+                                                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                                                """, (
+                item.ticker, item.name, 'MOEX', True, item.currency.value, item.figi, item.isin, item.lot,
+                item.min_price_increment, item.type.value, item.min_quantity))
+
+            conn.commit()
+
+        else:
+            print(f"{symbol} is already exist")
 
     return
 
@@ -244,17 +317,103 @@ def fill_tcs_bonds(conn, client):
 
     cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-    for item in bonds:
-        cursor.execute("""  INSERT INTO stock (symbol, name, exchange, is_etf, currency, figi, isin, lot, min_price_increment, type, min_quantity)
-                                                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                                            """, (
-            item.ticker, item.name, 'MOEX', False, item.currency.value, item.figi, item.isin, item.lot,
-            item.min_price_increment, item.type.value, item.min_quantity))
+    # check if such "symbol" exists in the table
+    cursor.execute(""" Select symbol from stock WHERE type='Bond' """)
+    fetched_rows = cursor.fetchall()
+    tickers = set()
+    for row in fetched_rows:
+        tickers.add(row[0])
 
-    conn.commit()
+
+    for item in bonds:
+        if symbol not in tickers:
+            cursor.execute("""  INSERT INTO stock (symbol, name, exchange, is_etf, currency, figi, isin, lot, min_price_increment, type, min_quantity)
+                                                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                                                """, (
+                item.ticker, item.name, 'MOEX', False, item.currency.value, item.figi, item.isin, item.lot,
+                item.min_price_increment, item.type.value, item.min_quantity))
+
+            conn.commit()
+
+        else:
+            print(f"{symbol} is already exist")
 
     return
 
+
+#  ------------------------ API V 2 --- Futures
+
+def fill_tcs_futures(conn):
+    """Through the API client,  the method receives information about bonds traded in TCS and
+    inserts a row into the table 'stock'.
+
+    Arguments:
+    conn: connection object
+    Returns: No returns
+    """
+    # headers and data for request
+    hed = {'Authorization': 'Bearer ' + config.TCS_API_2_token}
+    #
+    data = {
+        "instrument_status": "INSTRUMENT_STATUS_UNSPECIFIED"
+    }
+
+    # check if such "symbol" exists in the table
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cursor.execute(""" Select symbol from stock WHERE type='Futures' """)
+    fetched_rows = cursor.fetchall()
+    tickers = set()
+    for row in fetched_rows:
+        tickers.add(row[0])
+
+    #
+
+    url_get_futures = 'https://invest-public-api.tinkoff.ru/rest/tinkoff.public.invest.api.contract.v1.InstrumentsService/Futures'
+    response = requests.post(url_get_futures, json=data, headers=hed)
+    r = response.json()
+    r_text = response.text
+    print(response.status_code)
+    fut_list = r.get('instruments')
+
+
+    for item in fut_list:
+        symbol = item.get("ticker")
+        name = item.get("name")
+        exchange = item.get("exchange")
+        # is_etf = False
+        currency = item.get("currency").upper()
+        figi = item.get("figi")
+        # isin   =  Null
+        lot = item.get("lot")
+        # min_price_increment = Null
+        type = "Futures"
+        # min_quantity =  Null
+        fut_classCode = item.get("classCode")
+        fut_firstTradeDate = item.get("firstTradeDate")
+        fut_lastTradeDate = item.get("lastTradeDate")
+        futuresType = item.get("futuresType")
+        fut_basicAsset = item.get("basicAsset")
+        fut_basicAssetSize = item.get("basicAssetSize").get("units")
+        fut_expirationDate = item.get("expirationDate")
+
+        if symbol not in tickers:
+            cursor.execute("""  INSERT INTO stock (symbol, name, exchange, is_etf, currency, figi, isin, lot, min_price_increment, 
+            type, min_quantity, "fut_classCode", "fut_firstTradeDate", "fut_lastTradeDate", "futuresType", "fut_basicAsset", "fut_basicAssetSize", "fut_expirationDate")
+                                                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                                                                """, (symbol, name, exchange, False, currency, figi, None,
+                                                                      lot, None, type, None, fut_classCode, fut_firstTradeDate, fut_lastTradeDate,
+                                                                      futuresType, fut_basicAsset, fut_basicAssetSize, fut_expirationDate))
+            conn.commit()
+
+        else:
+            print(f"{symbol} is already exist")
+
+    conn.close()
+
+    return
+
+
+#  ------------------------ API V 2 --- Futures
 
 def save_tcs_operations_to_db(conn, client, acc_id, start_date, end_date):
     """Through the API client,  the method receives information about performed operations of the account,
@@ -277,9 +436,9 @@ def save_tcs_operations_to_db(conn, client, acc_id, start_date, end_date):
     cursor.execute(""" Select id from operations Where date >= %s and date <= %s and account_id=%s""",
                    (start_date, end_date, acc_id))
     fetched_rows = cursor.fetchall()
-    saved_operations = []
+    saved_operations = set()
     for row in fetched_rows:
-        saved_operations.append(row[0])
+        saved_operations.add(row[0])
 
     for item in operations:
         commission = item.commission if item.commission is None else item.commission.value  # if
@@ -324,6 +483,10 @@ if __name__ == '__main__':
     error_message = ""
     pg_connection = create_connection(config.DB_HOST, config.DB_USER, config.DB_PASS, config.DB_NAME)
 
+    # print(TCS_client.get_market_search_by_ticker("NLOK"))
+    # fill_tcs_stock(pg_connection, TCS_client)
+    # fill_tcs_futures(pg_connection)
+
     try:
         pg_cursor = pg_connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
@@ -332,6 +495,7 @@ if __name__ == '__main__':
             # start_date = last date in db, end_date = today
             pg_cursor.execute("Select MAX(date) from operations Where account_id=%s", (acc,))
             last_date = pg_cursor.fetchone()[0].date()                                  # date of last written operation
+            # last_date = datetime.strptime("01.11.2021", "%d.%m.%Y").date()
             start_date = datetime.combine(last_date, datetime.min.time())               # last_date  00 hours 00 min 00 sec
             end_date = datetime.combine(datetime.today().date(), datetime.max.time())   # today  23 hours 59 min 59 sec
             save_tcs_operations_to_db(pg_connection, TCS_client, acc, start_date, end_date)

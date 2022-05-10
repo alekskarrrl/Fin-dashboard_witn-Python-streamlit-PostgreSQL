@@ -71,15 +71,25 @@ def show_ratios(ticker):
     for i in range(0, math.ceil(len(list_ratios) / 3)):
         r1, r2, r3 = st.beta_columns(3)
 
+
         with r1:
             st.markdown(f"**{dict_ratios[list_ratios[i * 3 + 0]]}**")
-            st.markdown(f"<div style ='{r_style}'>{overview_data[list_ratios[i * 3 + 0]]}</div>", unsafe_allow_html=True)
+            if list_ratios[i * 3 + 0] in overview_data.keys():
+                st.markdown(f"<div style ='{r_style}'>{overview_data[list_ratios[i * 3 + 0]]}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style ='{r_style}'> N/A </div>", unsafe_allow_html=True)
         with r2:
             st.markdown(f"**{dict_ratios[list_ratios[i * 3 + 1]]}**")
-            st.markdown(f"<div style ='{r_style}'>{overview_data[list_ratios[i * 3 + 1]]}</div>", unsafe_allow_html=True)
+            if list_ratios[i * 3 + 1] in overview_data.keys():
+                st.markdown(f"<div style ='{r_style}'>{overview_data[list_ratios[i * 3 + 1]]}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style ='{r_style}'> N/A </div>", unsafe_allow_html=True)
         with r3:
             st.markdown(f"**{dict_ratios[list_ratios[i * 3 + 2]]}**")
-            st.markdown(f"<div style ='{r_style}'>{overview_data[list_ratios[i * 3 + 2]]}</div>", unsafe_allow_html=True)
+            if list_ratios[i * 3 + 2] in overview_data.keys():
+                st.markdown(f"<div style ='{r_style}'>{overview_data[list_ratios[i * 3 + 2]]}</div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style ='{r_style}'> N/A </div>", unsafe_allow_html=True)
 
     return 0
 

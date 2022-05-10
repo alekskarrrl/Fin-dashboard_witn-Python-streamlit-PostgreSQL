@@ -102,3 +102,4 @@ widgetsnbextension==3.5.1
 yarl==1.6.3
 cbrf==0.4.7
 tinvest==3.0.5
+grpcio-tools ~= 1.30

@@ -331,7 +331,7 @@ if option == "Tinkoff Invest":
 
             df_fifo_table = pd.DataFrame(columns=['buy_operation', 'buy_date', 'figi', 'ticker', 'buy_price',
                                                      'buy_quantity', 'currency', 'sell_operation', 'sell_date',
-                                                     'sell_price', 'sell_quantity'])
+                                                     'sell_price', 'sell_quantity', 'account'])
 
             sell_counter = 0
             for i, row in df_sell_buy_db.iterrows():
@@ -346,7 +346,7 @@ if option == "Tinkoff Invest":
                     df_fifo_table = df_fifo_table.append(
                         {'buy_operation': buy_operation, 'buy_date': buy_date, 'figi': figi,
                          'ticker': ticker, 'buy_price': buy_price, 'buy_quantity': buy_quantity,
-                         'currency': currency}, ignore_index=True)
+                         'currency': currency, 'account': selected_acc}, ignore_index=True)
 
                 elif row['operation_type'] == "Sell":
                     df_fifo_table['sell_operation'] = df_fifo_table['sell_operation'].astype('str')
