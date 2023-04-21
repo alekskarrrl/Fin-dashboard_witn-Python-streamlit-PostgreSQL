@@ -1,76 +1,112 @@
-Проект состоит из трех модулей, которые соответствуют выпадающему списку **"Select module"** в боковом меню.
 
 
-1. [Tinkoff Invest](#tinkoff-invest)
-2. [Fundamental Data](#fundamental-data)
-3. [Wallstreetbets](#wallstreetbets)
+<a name="readme-top"></a>
+# Project Title
 
-# <a id="tinkoff-invest">Tinkoff Invest</a>  
-**Цель:**  
-Анализ эффективности сделок по принципу FIFO, мониторинг брокерских комиссий и начисленных/уплаченных налогов  
+A brief description of what this project does and who it's for
 
-**Что сделано:**  
-- С помощью модуля [tinvest](https://daxartio.github.io/tinvest/) (Python модуль для работы с OpenAPI Тинькофф Инвестиции) получаем данные о состоянии портфеля ценных бумаг в разбивке по счетам, полную информацию об операциях по брокерским счетам за выбранный период, рыночную информацию и биржевых инструментах,
-- организовано хранение данный из Tinkoff Invest в базе данных PostgreSQL, а также чтение из БД,
-- детализация по типам операций по выбранному инструменту за указанный период времени,
-- реализовано построение таблицы FIFO сделок купли-продажы выбранной бумаги с учетом курса валюты на дату покупки и продажи активов. Курс валют взят по данным ЦБ РФ, так как для целей налогообложения доходы и расходы в валюте конвертируются в рубли именно по курсу ЦБ РФ.
-Курсы основных валют получены через [сервис ЦБ РФ](https://www.cbr.ru/development/SXML/) в формате XML, извлечены из документа XML и сохранены в БД (PostgreSQL)  
-Для закрытых сделок расчитана прибыль в валюте инструмента и в рублях.
-Для открытых позиций расчитана ожидаемая прибыль при продаже в текущий день по текущей цене в валюте и выполнен пересчет в рубли по текущему курсу ЦБ РФ (логика - прибыль при продаже актива сегодня по текущей цене и при текущем курсе валюты относительно рубля)  
-Выгрузка таблицы в файл .csv
+![Tinkoff Invest](img/data_pipe.JPG "")
+
+
+## Навигация
+* [Инструменты](#инструменты)
+* [Источники данных](#источники-данных)
+* [Features](#features)
+* [Дополнительно](#дополнительно)
+* [ROADMAP](#roadmap)
+* [DEMO](#demo)
+* [Private settings](#private-settings)
+* [Deployment](#deployment)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Инструменты
+
+- UI: streamlit==1.20.0 
+- Python 3.9
+- PostgreSQL 14
+- Apache Superset 
+- Docker
+- Apache Airflow (soon ...)
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Источники данных
+
+- Alpha Vantage API  - [документация](https://www.alphavantage.co/documentation/)  
+    Квартальные и годовые отчеты по эмитентам
+- Tinkoff Invest API  - [документация](https://tinkoff.github.io/investAPI/swagger-ui/#/)    
+    рыночные цены, операции по счету
+- сайт ЦБ РФ  - [документация](https://cbr.ru/development/SXML/)  
+    валютные курсы по ЦБ РФ на дату
+- отчеты других брокеров в формате csv
+
+
+<div><p align="right">(<a href="#readme-top">back to top</a>)</p></div>
+
+## Features
+
+- ...
+- ...
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Дополнительно 
+ERD диаграмма базы данных
+
+![ERD](img/ERD_diagram.jpg "")
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Roadmap
+
+- [x] Add something ...
+- [ ] Add something else ...
+    - [ ] and more ...
+
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Demo
+
+Insert gif or link to demo
 
 ![Tinkoff Invest](img/screen_2.gif "Demonstration of the 'Tinkoff Invest' block")
 
-
-**Что планируется:**  
-- рефакторинг,  
-- Организовать хранение и обновление котировок доступных биржевых инструментов,
-- Построить сводный отчет FIFO по портфелю (по аналогии с брокерским FIFO отчетом),  
-- Расчет налогов,  
-- Добавить сводный отчет по дивидендам, комиссиям и прочим расходам/доходам,   
-- Прописать логику для бондов,  
-- Расчет чистой внутренней доходности портфеля.  
-*В отдельный модуль:*  
-- Визуализация, графики в потоке,  
-- Анализ временных рядов, построение предиктивных моделей по рыночным данным,  
-
-# <a id="fundamental-data">Fundamental Data</a> 
-**Что сделано:**   
-С помощью [Alpha Vantage API](https://www.alphavantage.co/documentation/) выводится информация о компании по введенному тикеру в боковой панели:
-- краткое описание деятельности компании,
-- набор коэфициентов (нужно пересмотреть набор),
-- квартальные и годовые отчеты на выбор за необходимое количество периодов в формате таблицы или столбчатых диаграм:
-    - Баланс (Balance Sheet),
-    - Отчет о прибыли (Income Statement),
-    - Отчет о движении денежных средств (Cash Flow).
-    
-В каждом виде отчета по умолчанию выбрано несколько наиболее важных показателей, но по желанию можно выбрать дополнительные из выпадающего списка 
-
 ![Fundamental Data](img/screen_3.gif "Demonstration of the 'Fundamental Data' block")
-
-**Что планируется:**  
-- рефакторинг, организовать хранение фундамельтальных отчетов в БД, 
-- добавить фундаментальные мультипликаторы,
-- доработать дизайн графиков (нужна вертикальная ось, графики прозрачные, поправить отображение текста слева от диаграмм, возможно изменить цветовую схему и тд),   
-- Дальнейший анализ и сопоставление показателей с рыночными ценами,  
-- Обнаружена проблема: отчеты по тикеру могут быть в разной валюте (пример VALE - часть отчетов в валюте USD, часть в BRL).
-
-
-
-
-# <a id="wallstreetbets">Wallstreetbets</a>    
-
-**Что сделано:**  
-- на графике выводится топ самый упоминаемых в сабредите "wallstreetbets" акций за последние 14 дней.
-- под графиком выводятся сообщения, содержащие упоминание выбранного тикера (тикер указывается в меню слева).
 
 ![Wallstreetbets](img/screen_1.gif "Demonstration of the 'Wallstreetbets' block")
 
-**Что планируется:**  
 
-*to be continued...*
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Private settings
+
+To run this project, you will need to add the following variables to your config.py file
+
+Для подключения к базе данных:  
+`DB_HOST` = ""  
+`DB_USER` = ""  
+`DB_PASS` = ""  
+`DB_NAME` = ""  
+
+Alpha Vantage API token:  
+`AV_KEY` =  
+
+Tinkoff Invest API token:  
+`TCS_API_token`= ""  
+`TCS_API_2_token` = ""  
 
 
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Deployment
 
+To deploy this project ...
 
+*Редактируется...*
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
