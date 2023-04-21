@@ -1,15 +1,19 @@
 import pandas as pd
-from datetime import datetime, date, time
-import numpy as np
+from datetime import datetime
 import math
 import requests
 import streamlit as st
 import altair as alt
+import os
+from dotenv import load_dotenv
 
-import config
 
 
-@st.cache
+
+load_dotenv()
+
+
+@st.cache_data
 def get_overview_data(ticker):
     # ---------------------------------------------
     # Get overview from API.The overview contains a brief description
@@ -17,7 +21,7 @@ def get_overview_data(ticker):
     # ticker - string
     # ---------------------------------------------
 
-    url = f'https://www.alphavantage.co/query?function=OVERVIEW&symbol={ticker}&apikey={config.AV_KEY}'
+    url = f'https://www.alphavantage.co/query?function=OVERVIEW&symbol={ticker}&apikey={os.getenv("AV_KEY")}'
     r = requests.get(url)
     return r.json()
 
@@ -69,7 +73,7 @@ def show_ratios(ticker):
                   'PayoutRatio': 'Payout Ratio', 'DividendDate': 'Dividend Date'}
 
     for i in range(0, math.ceil(len(list_ratios) / 3)):
-        r1, r2, r3 = st.beta_columns(3)
+        r1, r2, r3 = st.columns(3)
 
 
         with r1:
@@ -93,7 +97,7 @@ def show_ratios(ticker):
 
     return 0
 
-@st.cache
+@st.cache_data
 def get_reports_data(ticker, report_type):
     # --------------------------------------------------
     # Getting data with regular financial reports using an API request
@@ -113,7 +117,7 @@ def get_reports_data(ticker, report_type):
         reports_func = "CASH_FLOW"
 
     # Send API request
-    url = f'https://www.alphavantage.co/query?function={reports_func}&symbol={ticker}&apikey={config.AV_KEY}'
+    url = f'https://www.alphavantage.co/query?function={reports_func}&symbol={ticker}&apikey={os.getenv("AV_KEY")}'
     r = requests.get(url)
     return r.json()
 
@@ -165,7 +169,7 @@ def show_reports_visualization(fields, df):
 
 
     for field in fields:
-        col1, col2 = st.beta_columns([2, 5])
+        col1, col2 = st.columns([2, 5])
         with col1:
             st.subheader(field)
         with col2:

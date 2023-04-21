@@ -1,11 +1,12 @@
 # Ignore config file
-config.py
-.dockerignore
-requirements_old.txt
 *.stg
-Dockerfile
 *.bat
-env/
+*.pgerd
+venv/
 .idea/
-
+cache/
+.env
+*.png
+draft_code/
 __pycache__/
+docker-compose.yaml

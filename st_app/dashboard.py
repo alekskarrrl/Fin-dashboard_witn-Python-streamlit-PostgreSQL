@@ -4,30 +4,29 @@ Created on Tue Mar  2 00:55:35 2021
 
 @author: User
 """
-from datetime import datetime, date, time
+from datetime import datetime
 import streamlit as st
 import pandas as pd
-import numpy as np
-import requests
-import matplotlib.pyplot as plt
-import json
-import plotly.express as px
-import psycopg2, psycopg2.extras
+import psycopg2.extras
 import altair as alt
-import math
 import tinvest
 import csv
+import os
 
 import tinkoff_invest as tcs
 import cbrf_currencies as cbr
 import wallstreetbets as wsb
 import fundamental
-import config
+from PIL import Image
+from dotenv import load_dotenv
 
+load_dotenv()
 # proxie={'https' : 'https://15.188.82.98:80'}
 proxie = {'https': 'https://103.138.40.202:8080'}
 
-st.image("top_img.jpg")
+image = Image.open('top_img.jpg')
+
+st.image(image)
 
 st.sidebar.title("Options")
 
@@ -36,8 +35,7 @@ option = st.sidebar.selectbox("Select module",
 # st.header(option)
 
 
-connection = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME, user=config.DB_USER,
-                              password=config.DB_PASS)
+connection = psycopg2.connect(host=os.getenv('DB_HOST'), database=os.getenv('DB_NAME'), user=os.getenv('DB_USER'), password=os.getenv('DB_PASS'))
 cursor = connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
 # ----------------wallstreetbets -------------------------------------------------------
@@ -77,7 +75,7 @@ if option == "Wallstreetbets":
     df_top = pd.DataFrame(columns=['symbol', 'counts'])
     for count in counts:
         # st.write(count[1], ': ', count[0],  ' comments')
-        df_top = df_top.append({'symbol': count[1], 'counts': count[0]}, ignore_index=True)
+        df_top = pd.concat([df_top, pd.Series({'symbol': count[1], 'counts': count[0]}).to_frame().T], ignore_index=True)
 
     df_top['counts'] = df_top['counts'].astype('int64')
     df_top.sort_values(by='counts', ascending=True, inplace=True)
@@ -105,7 +103,7 @@ if option == "Fundamental Data":
     # ----- OVERVIEW  BLOCK ________________________________
     fundamental.show_header(ticker)
     st.subheader("")
-    with st.beta_expander("Company Description: "):
+    with st.expander("Company Description: "):
         fundamental.show_description(ticker)
 
     fundamental.show_ratios(ticker)
@@ -128,7 +126,7 @@ if option == "Fundamental Data":
 
     df_pivot = fundamental.dataframe_reports(ticker, reports, number_quarter, period)
 
-    with st.beta_expander(f"Show {reports} dataframe"):
+    with st.expander(f"Show {reports} dataframe"):
         st.dataframe(df_pivot)
 
     st.text(""
@@ -153,7 +151,7 @@ if option == "Fundamental Data":
 
     df_pivot_T = df_pivot.transpose().reset_index()
 
-    with st.beta_expander(f"Show {reports} visualization"):
+    with st.expander(f"Show {reports} visualization"):
 
         list_of_fields = st.multiselect("Select metrics to visualize: ", df_pivot_T.columns[1:].to_list(),
                                         default=list_of_fields_default)
@@ -163,11 +161,11 @@ if option == "Fundamental Data":
 # ----------------------Tinkoff Invest---------------------------------------
 
 if option == "Tinkoff Invest":
-    TCS_client = tinvest.SyncClient(config.TCS_API_token)  # create tinvest client
+    TCS_client = tinvest.SyncClient(os.getenv('TCS_API_TOKEN'))  # create tinvest client
     accs_info = tcs.get_user_accs_info(TCS_client)
 
-    connection = psycopg2.connect(host=config.DB_HOST, database=config.DB_NAME, user=config.DB_USER,
-                                  password=config.DB_PASS)
+    connection = psycopg2.connect(host=os.getenv('DB_HOST'), database=os.getenv('DB_NAME'), user=os.getenv('DB_USER'),
+                                  password=os.getenv('DB_PASS'))
     cursor = connection.cursor(cursor_factory=psycopg2.extras.DictCursor)
     select_acc = ["Combined"]
     for item in accs_info.items():
@@ -187,24 +185,28 @@ if option == "Tinkoff Invest":
     selected_acc = st.selectbox("Please choose account for FIFO analysis: ", select_acc)
 
     portfolio = pd.DataFrame()
-    with st.beta_expander("Show portfolios"):
+    with st.expander("Show portfolios"):
         str_query = """Select distinct(symbol) from operations, stock Where stock_id is not null and 
                         stock_id = stock.id"""
 
         if selected_acc != "Combined":
             acc_id = selected_acc.split(" ")[0]
-            portfolio = tcs.get_positions_by_acc(acc_id, TCS_client)  # get portfolio by broker_account_id and save
+            portfolio = tcs.get_positions(acc_id, TCS_client)  # get portfolio by broker_account_id and save
             st.write(f"Broker account type = {accs_info.get(acc_id)}")  # Render on the page broker_account_type
             st.write(f"Broker account id = {acc_id}")  # and broker_account_id
+
+            # PORTFOLIO - OK
             st.dataframe(portfolio)
             st.subheader("Cash position: ")
-            st.dataframe(tcs.get_currency_balance_by_acc(acc_id, TCS_client))
+            # CASH - OK
+            st.dataframe(tcs.get_cash_balance(acc_id, TCS_client))
             str_query = """Select distinct(symbol) from operations, stock Where stock_id is not null and stock_id = stock.id and account_id = %s"""
             cursor.execute(str_query, (acc_id,))
 
         elif selected_acc == "Combined":
             for item in accs_info.items():
-                portfolio = portfolio.append(tcs.get_positions_by_acc(item[0], TCS_client), ignore_index=True)
+                # portfolio = portfolio.append(tcs.get_positions(item[0], TCS_client), ignore_index=True)
+                portfolio = pd.concat([portfolio, tcs.get_positions(item[0], TCS_client)], ignore_index=True)
             st.dataframe(portfolio)
             cursor.execute(str_query)
 
@@ -223,9 +225,25 @@ if option == "Tinkoff Invest":
     selected_ticker = st.selectbox("Select ticker for FIFO analysis: ", options=ticker_list_with_All)
     figi_by_ticker = TCS_client.get_market_search_by_ticker(selected_ticker).payload.instruments[0].figi
 
-    with st.beta_expander("Show reports by operations type"):
+    with st.expander("Show reports by operations type"):
         operation_types_list = ['BrokerCommission', 'Sell', 'Buy', 'Dividend', 'MarginCommission', 'PayIn',
-                                'ServiceCommission', 'PayOut', 'TaxBack', 'TaxDividend', 'BuyCard', 'Other']
+                                'ServiceCommission', 'PayOut', 'TaxBack', 'TaxDividend', 'BuyCard', 'Other',
+                                'OPERATION_TYPE_UNSPECIFIED', 'OPERATION_TYPE_INPUT', 'OPERATION_TYPE_BOND_TAX',
+                                'OPERATION_TYPE_OUTPUT_SECURITIES', 'OPERATION_TYPE_OVERNIGHT', 'OPERATION_TYPE_TAX',
+                                'OPERATION_TYPE_BOND_REPAYMENT_FULL', 'OPERATION_TYPE_SELL_CARD', 'OPERATION_TYPE_DIVIDEND_TAX',
+                                'OPERATION_TYPE_OUTPUT', 'OPERATION_TYPE_BOND_REPAYMENT', 'OPERATION_TYPE_TAX_CORRECTION',
+                                'OPERATION_TYPE_SERVICE_FEE', 'OPERATION_TYPE_BENEFIT_TAX', 'OPERATION_TYPE_MARGIN_FEE',
+                                'OPERATION_TYPE_BUY', 'OPERATION_TYPE_BUY_CARD', 'OPERATION_TYPE_INPUT_SECURITIES',
+                                'OPERATION_TYPE_SELL_MARGIN', 'OPERATION_TYPE_BROKER_FEE', 'OPERATION_TYPE_BUY_MARGIN',
+                                'OPERATION_TYPE_DIVIDEND', 'OPERATION_TYPE_SELL', 'OPERATION_TYPE_COUPON', 'OPERATION_TYPE_SUCCESS_FEE',
+                                'OPERATION_TYPE_DIVIDEND_TRANSFER', 'OPERATION_TYPE_ACCRUING_VARMARGIN',
+                                'OPERATION_TYPE_WRITING_OFF_VARMARGIN', 'OPERATION_TYPE_DELIVERY_BUY', 'OPERATION_TYPE_DELIVERY_SELL',
+                                'OPERATION_TYPE_TRACK_MFEE', 'OPERATION_TYPE_TRACK_PFEE', 'OPERATION_TYPE_TAX_PROGRESSIVE',
+                                'OPERATION_TYPE_BOND_TAX_PROGRESSIVE', 'OPERATION_TYPE_DIVIDEND_TAX_PROGRESSIVE',
+                                'OPERATION_TYPE_BENEFIT_TAX_PROGRESSIVE', 'OPERATION_TYPE_TAX_CORRECTION_PROGRESSIVE',
+                                'OPERATION_TYPE_TAX_REPO_PROGRESSIVE', 'OPERATION_TYPE_TAX_REPO', 'OPERATION_TYPE_TAX_REPO_HOLD',
+                                'OPERATION_TYPE_TAX_REPO_REFUND', 'OPERATION_TYPE_TAX_REPO_HOLD_PROGRESSIVE',
+                                'OPERATION_TYPE_TAX_REPO_REFUND_PROGRESSIVE', 'OPERATION_TYPE_DIV_EXT', 'OPERATION_TYPE_TAX_CORRECTION_COUPON']
 
         selected_type = st.selectbox("Select the type of transactions to view information for the selected period: ",
                                      options=operation_types_list)
@@ -281,15 +299,25 @@ if option == "Tinkoff Invest":
                 cursor.execute(basic_query, (selected_type, start_date, end_date))
 
         fetched_output = cursor.fetchall()
+        # st.write(fetched_output)
         for row in fetched_output:
-            df_report = df_report.append(
-                {'operation_type': row[0], 'account_id': row[1], 'account_type': row[2], 'date': row[3],
-                 'operation_id': row[4], 'commission': row[5], 'currency': row[6], 'ticker': row[7],
-                 'stock_name': row[8], 'instrument_type': row[9], 'price': row[10],
-                 'quantity': row[11], 'quantity_executed': row[12], 'payment': row[13]}, ignore_index=True)
+            df_report = pd.concat([df_report, pd.Series({'operation_type': row[0],
+                                                         'account_id': row[1],
+                                                         'account_type': row[2],
+                                                         'date': row[3],
+                                                        'operation_id': row[4],
+                                                         'commission': row[5],
+                                                         'currency': row[6],
+                                                         'ticker': row[7],
+                                                         'stock_name': row[8],
+                                                         'instrument_type': row[9],
+                                                         'price': row[10],
+                                                         'quantity': row[11],
+                                                         'quantity_executed': row[12],
+                                                         'payment': float(row[13])}).to_frame().T], ignore_index=True)
         st.write(df_report)
 
-    with st.beta_expander(f"FIFO by ticker {selected_ticker}"):
+    with st.expander(f"FIFO by ticker {selected_ticker}"):
         if selected_ticker != 'All':
 
             # Create df_sell_buy table from DB
@@ -317,11 +345,18 @@ if option == "Tinkoff Invest":
                 cursor.execute(query_sell_buy, (start_date, end_date, selected_ticker))
 
             fetched_sell_buy = cursor.fetchall()
+            # st.write(fetched_sell_buy)
             for row in fetched_sell_buy:
-                df_sell_buy_db = df_sell_buy_db.append({'operation_type': row[0], 'date': row[1], 'figi': row[2],
-                                                        'ticker': row[3], 'price': row[4], 'currency': row[5],
-                                                        'payment': row[6],
-                                                        'quantity_executed': row[7]}, ignore_index=True)
+
+                df_sell_buy_db = pd.concat([df_sell_buy_db, pd.Series({'operation_type': row[0],
+                                                                       'date': row[1],
+                                                                       'figi': row[2],
+                                                                        'ticker': row[3],
+                                                                       'price': float(row[4]),
+                                                                       'currency': row[5],
+                                                                        'payment': float(row[6]),
+                                                                        'quantity_executed': row[7]}).to_frame().T],
+                                           ignore_index=True)
 
             st.subheader("Buy and Sell table: ")
 
@@ -343,10 +378,14 @@ if option == "Tinkoff Invest":
                     buy_price = float(row['price'])
                     buy_quantity = row['quantity_executed']
                     currency = row['currency']
-                    df_fifo_table = df_fifo_table.append(
-                        {'buy_operation': buy_operation, 'buy_date': buy_date, 'figi': figi,
-                         'ticker': ticker, 'buy_price': buy_price, 'buy_quantity': buy_quantity,
-                         'currency': currency, 'account': selected_acc}, ignore_index=True)
+                    df_fifo_table = pd.concat([df_fifo_table, pd.Series({'buy_operation': buy_operation,
+                                                                         'buy_date': buy_date,
+                                                                         'figi': figi,
+                                                                        'ticker': ticker,
+                                                                         'buy_price': buy_price,
+                                                                         'buy_quantity': buy_quantity,
+                                                                        'currency': currency,
+                                                                         'account': selected_acc}).to_frame().T], ignore_index=True)
 
                 elif row['operation_type'] == "Sell":
                     df_fifo_table['sell_operation'] = df_fifo_table['sell_operation'].astype('str')
@@ -412,7 +451,7 @@ if option == "Tinkoff Invest":
                             sell_counter += 1
 
             df_fifo_table['Profit'] = df_fifo_table.buy_quantity * (
-                    df_fifo_table.sell_price - df_fifo_table.buy_price).astype('float').round(4)
+                    df_fifo_table.sell_price.astype('float') - df_fifo_table.buy_price).astype('float').round(4)
 
             current_profit_db = 0
             current_profit_RUB_db = 0
@@ -422,7 +461,7 @@ if option == "Tinkoff Invest":
                                                        ex_rates_buy_date='', ex_rates_sell_date='')
 
             for i, row in df_fifo_table.iterrows():
-                if row['buy_date'] == row['buy_date'] and row['buy_date'] != 'nan':
+                if row['buy_date'] == row['buy_date'] and row['buy_date'] != 'nan':  # What the fuck????
                     char_code = row['currency']
                     buy_price = row['buy_price']
                     date = row['buy_date']
@@ -433,6 +472,8 @@ if option == "Tinkoff Invest":
                     sell_price = row['sell_price']
                     date = row['sell_date']
                     df_fifo_table.loc[i, 'ex_rates_sell_date'] = cbr.get_currency_value(connection, char_code, date) if char_code != 'RUB' else 1
+
+                    # PROBLEM HERE
                     df_fifo_table.loc[i, 'sell_price_RUB'] = round(sell_price * df_fifo_table.loc[i, 'ex_rates_sell_date'], 2)
 
                 if row['buy_date'] != 'nan' and row['buy_date'] == row['buy_date'] and row['sell_date'] != 'nan' and \

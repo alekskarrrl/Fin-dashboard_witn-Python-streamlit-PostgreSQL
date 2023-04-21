@@ -3,14 +3,14 @@ import xml.etree.ElementTree as ET
 import psycopg2.extras
 from datetime import datetime
 from datetime import timedelta
-from decimal import Decimal
 from tinkoff_invest import create_connection
+from dotenv import load_dotenv
+import os
 
-import config
-
+load_dotenv()
 
 """This module contains methods for obtaining data on the dynamics of exchange rates from the official website 
-of the Central Bank of the Russian Federation and writing them in the database PostgreSQL.
+of the Central Bank of the Russian Federation (https://cbr.ru/development/SXML/) and writing them in the database PostgreSQL.
 
 For example, to get quotes for a given day
 https://www.cbr.ru/scripts/XML_daily.asp?date_req=02/03/2002
@@ -60,11 +60,11 @@ def fill_currencies_catalog(conn):
     full_catalog = requests.get(url_full_catalog)
 
     # Save data to xml file
-    with open('data/full_catalog.xml', 'w') as k:
+    with open('../data/full_catalog.xml', 'w') as k:
         k.write(full_catalog.text)
 
     # Parse the xml file, extract the required fields for writing to the database
-    tree = ET.parse('data/full_catalog.xml')
+    tree = ET.parse('../data/full_catalog.xml')
     root = tree.getroot()
 
     for curr in root.findall('Item'):
@@ -115,11 +115,11 @@ def fill_currency_by_char_code(conn, char_code, date_start, date_end):
     dynamic = requests.get(url_dynamic)
 
     # Save data to xml file
-    with open('data/dynamic.xml', 'w') as m:
+    with open('../data/dynamic.xml', 'w') as m:
         m.write(dynamic.text)
 
     # Parse the xml file, extract the required fields for writing to table 'currency_price'
-    tree = ET.parse('data/dynamic.xml')
+    tree = ET.parse('../data/dynamic.xml')
     root = tree.getroot()
     for record in root.findall('Record'):
         record_date = record.get('Date')
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     """
 
     error_message = ""
-    pg_connection = create_connection(config.DB_HOST, config.DB_USER, config.DB_PASS, config.DB_NAME)
+    pg_connection = create_connection(os.getenv('DB_HOST'), os.getenv('DB_USER'), os.getenv('DB_PASS'), os.getenv('DB_NAME'))
     currency_list = ['USD', 'EUR', 'GBP', 'SEK', 'CHF', 'JPY', 'CNY']    # list of popular currencies to write to the database
 
     try:

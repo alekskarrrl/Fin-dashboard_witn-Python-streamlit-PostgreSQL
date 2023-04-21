@@ -1,0 +1,53 @@
+version: '3'
+
+services:
+  postgres:
+    build: ./postgres
+    container_name: database
+    volumes:
+      - st_app_db:/var/lib/postgresql/data
+      - adj_volume:/adj_files
+    environment:
+      POSTGRES_DB: <YOUR_DB_NAME>
+      POSTGRES_USER: <YOUR_PG_USER>
+      POSTGRES_PASSWORD: <YOUR_PG_PASS>
+    networks:
+      - st_app_net
+    ports:
+      - "5432:5432"
+
+  superset:
+    build: ./superset
+    container_name: superset
+    environment:
+      SUPERSET_SECRET_KEY: <SUPERSET_SECRET>
+
+    networks:
+      - st_app_net
+    ports:
+      - "8080:8088"
+
+  python-st-app:
+    build: ./st_app
+    container_name: streamlit_app
+    ports:
+      - "8501:8501"
+    networks:
+      - st_app_net
+    environment:
+      DB_HOST: database
+      DB_USER: <YOUR_PG_USER>
+      DB_PASS: <YOUR_PG_PASS>
+      DB_NAME: <YOUR_DB_NAME>
+
+volumes:
+  st_app_db:
+    name: st_app_db
+  adj_volume:
+    name: adj_volume
+
+networks:
+  st_app_net:
+    name: st_app_net
+
+
